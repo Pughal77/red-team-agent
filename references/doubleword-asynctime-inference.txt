@@ -1,0 +1,103 @@
+Async Inference
+Async inference lets you make LLM requests at reduced cost by relaxing latency requirements. It balances latency and throughput — faster turnaround than batch, higher throughput than realtime — and results are available via polling. Submitted work is guaranteed to start processing within a minute, making it a great fit for background agents that need to keep moving without paying realtime rates.
+
+The request flow mirrors realtime background mode; the one difference is service_tier: "flex", which trades minutes-scale latency for a lower rate.
+
+Async TTFT Guarantees
+Each model you call is guaranteed a request that starts within a minute; a large burst of requests submitted at once for the same model and tier won't all start within a minute.
+
+Why Async Inference?
+OpenAI-compatible — Uses the standard openai SDK with the Open Responses API
+Lower cost — Async requests are priced below realtime, above batch
+Fast to start — Submitted work is guaranteed to begin processing within a minute
+No JSONL files — Unlike batch inference, you make standard API calls
+Background or blocking — Return immediately with a response ID, or hold the connection until complete
+When to use Async Inference
+Async inference is the right choice when your application makes LLM calls that don't need to resolve instantly. Common use cases include:
+
+Agentic workflows — Multi-step agent systems where individual steps can be processed asynchronously
+Background processing — Content generation, summarization, or classification running behind a queue
+Development and testing — Running evaluations or prompt iterations where you don't need instant feedback
+Cost optimization — Any workload that can tolerate a short asynchronous delay in exchange for lower cost
+Quick Start
+1. Create an API Key
+Generate a key from the Doubleword Console, or sign in above to auto-populate the code examples.
+
+2. Submit a request with service_tier: "flex"
+
+Python
+from openai import OpenAI
+from time import sleep
+
+client = OpenAI(
+    base_url="https://api.doubleword.ai/v1",
+    api_key="{{apiKey}}"
+)
+
+# Submit an async request — returns immediately with status "queued"
+resp = client.responses.create(
+    model="Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+    input="Explain the theory of relativity in detail.",
+    service_tier="flex",
+    background=True,
+)
+
+print(f"Queued: {resp.id} (status: {resp.status})")
+
+# Poll until the inference service completes it
+while resp.status in ("queued", "in_progress"):
+    sleep(2)
+    resp = client.responses.retrieve(resp.id)
+    print(f"Status: {resp.status}")
+
+print(f"
+Output:
+{resp.output_text}")
+
+Blocking mode
+If you prefer to hold the connection until the result is ready, omit background. This is best for short waits — if a request may take minutes, prefer background mode to avoid connection timeouts.
+
+
+Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://api.doubleword.ai/v1",
+    api_key="{{apiKey}}"
+)
+
+# Blocks until the async request completes
+resp = client.responses.create(
+    model="Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+    input="Summarize the history of artificial intelligence.",
+    service_tier="flex",
+)
+
+print(resp.output_text)
+
+How It Works
+You submit a request with service_tier: "flex" via the Responses API
+Doubleword queues it for asynchronous processing
+The request is queued and processed by the inference service
+Results are available via GET /v1/responses/{id} or by polling
+Your code receives a standard Open Responses API response object
+Using Autobatcher
+For existing Chat Completions code, the Autobatcher can automatically run your realtime calls asynchronously — no code changes required beyond configuration.
+
+
+Python
+from autobatcher import AsyncOpenAI
+
+client = AsyncOpenAI(
+    api_key="{{apiKey}}",
+    base_url="https://api.doubleword.ai/v1"
+)
+
+# Looks like a normal OpenAI call, but runs asynchronously
+response = await client.chat.completions.create(
+    model="Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+    messages=[{"role": "user", "content": "Explain quantum computing"}],
+)
+
+print(response.choices[0].message.content)
+

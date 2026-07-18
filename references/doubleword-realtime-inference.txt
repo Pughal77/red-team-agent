@@ -1,0 +1,83 @@
+Realtime Inference
+The realtime API is perfect for development to quickly iterate on prompts, validate model behavior, and prototype your pipeline. For production workloads that don't need instant responses, consider Async Inference or Batch Inference for significant cost savings.
+
+Quick Start
+Using the Playground
+The fastest way to test the realtime API is through our interactive playground. Simply select a model, enter your prompt, and get instant responses.
+
+Chat Completions
+
+Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://api.doubleword.ai/v1",
+    api_key="{{apiKey}}"
+)
+
+response = client.chat.completions.create(
+    model="Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is batch inference?"}
+    ]
+)
+
+print(response.choices[0].message.content)
+
+Open Responses API
+The Open Responses API provides a unified interface with built-in support for background processing. Use service_tier: "priority" for realtime inference:
+
+
+Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://api.doubleword.ai/v1",
+    api_key="{{apiKey}}"
+)
+
+# Blocking — waits for the response
+resp = client.responses.create(
+    model="Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+    input="Explain quantum computing in one paragraph.",
+    service_tier="priority",
+)
+
+print(resp.output_text)
+
+Background Mode
+For longer-running requests, use background=True to return immediately and poll for the result:
+
+
+Python
+from openai import OpenAI
+from time import sleep
+
+client = OpenAI(
+    base_url="https://api.doubleword.ai/v1",
+    api_key="{{apiKey}}"
+)
+
+resp = client.responses.create(
+    model="Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+    input="Write a detailed essay about the history of space exploration.",
+    service_tier="priority",
+    background=True,
+)
+
+# Poll until complete
+while resp.status in ("queued", "in_progress"):
+    print(f"Status: {resp.status}")
+    sleep(2)
+    resp = client.responses.retrieve(resp.id)
+
+print(f"Done! Output:
+{resp.output_text}")
+
+Background mode still runs at priority pricing and starts immediately — it simply lets you poll for the result instead of holding the connection open. To trade latency for a lower rate, use Async Inference with service_tier: "flex".
+
+Next Steps
+Get started with Async Inference — lower cost with service_tier: "flex"
+Learn more about Batch Inference — lowest cost for bulk workloads
+View available models

@@ -1,0 +1,232 @@
+Batch Inference
+This guide will walk you through submitting your first batch to Doubleword.
+
+You can submit a batch either through the Doubleword Console or via the Batch API, which is fully compatible with the OpenAI batch endpoint, making it seamless to switch between providers.
+
+When you submit a batch file, you're sending multiple requests to be processed in parallel. Each request is formatted as a single line in your batch file, allowing for efficient bulk processing.
+
+Batch processing is ideal for workloads that:
+
+Contain multiple independent requests that can run simultaneously
+Don't require immediate responses
+Would otherwise exceed rate limits if sent individually
+Tip
+Don't want to manage JSONL files and batch lifecycles manually? The Autobatcher provides BatchOpenAI — a drop-in OpenAI client that handles batching automatically. Install with pip install autobatcher or npm install autobatcher.
+
+Tip
+Don't want to go step by step? Jump straight to our interactive API reference docs.
+
+1. Prepare your batch file (.jsonl)
+Each batch workload starts with a .jsonl file where each line contains a single, valid API request1.
+
+Each line in your .jsonl file must include these required fields:
+
+custom_id: Your unique identifier for tracking the request (string, max 64 characters)
+method: HTTP method, always "POST"
+url: API endpoint, typically "/v1/chat/completions"
+body: The actual API request parameters (model, messages, temperature, etc.). This is the same body as your realtime request.
+Below is an example batch jsonl file with 4 requests - including both text-only and multi-modal requests with both image URLs and base64 encoded images2.
+
+{"custom_id": "colorado", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8", "messages": [{"role": "user", "content": "What is the capital of Colorado?"}]}}
+{"custom_id": "image-boardwalk", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8", "messages": [{"role": "user", "content": [{"type": "text", "text": "What is in this image?"}, {"type": "image_url", "image_url": {"url": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4"}}]}]}}
+{"custom_id": "python-code", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8", "messages": [{"role": "user", "content": "Write a Python function that calculates the fibonacci sequence."}]}}
+{"custom_id": "blue-square", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8", "messages": [{"role": "user", "content": [{"type": "text", "text": "What color is this image?"}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCABkAGQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDxyiiiv3E8wKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooA//Z"}}]}]}}
+
+Copy the content into a file named batch_input_example.jsonl or download the example file here.
+
+2. Upload your batch input file
+Caution
+The current limits are 200MB max file size and 50,000 max requests per file. If your file exceeds either limit, we suggest splitting it into multiple files.
+
+Batch API
+Simply point the OpenAI base URL to Doubleword and include your API key3.
+
+
+Python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="{{apiKey}}",
+    base_url="https://api.doubleword.ai/v1"
+)
+
+batch_input_file = client.files.create(
+    file=open("batch_input_example.jsonl", "rb"),
+    purpose="batch"
+)
+
+print(batch_input_file)
+
+The results should look like:
+
+{"id":"09efc84c-cd4f-4ae9-a2fd-5efbc4213225", "object": "file", "bytes": 899, "created_at": 1766154501, "filename": "batch_input_example.jsonl", "purpose": "batch", "expires_at": 1768746501}
+
+Note
+The returned id is the file id. You'll pass it as input_file_id when you create the batch in the next step.
+
+Doubleword Console
+You can also create a batch directly in the Doubleword Console:
+
+Navigate to the Batches section
+Click Create First Batch
+Upload your .jsonl file — the batch starts processing as soon as the file is uploaded
+3. Create the Batch
+Batch API
+Once you have uploaded the file, you can now create the batch, and set the requests in motion.
+
+
+Python
+from openai import OpenAI
+client = OpenAI(
+    api_key="{{apiKey}}",
+    base_url="https://api.doubleword.ai/v1/"
+)
+
+batch_input_file_id = batch_input_file.id
+result = client.batches.create(
+    input_file_id=batch_input_file_id,
+    endpoint="/v1/chat/completions",
+    completion_window="24h",
+    metadata={
+        "description": "daily eval job"
+    }
+)
+print(result)
+
+Set the completion window to 24h.
+
+If you need results back faster, the Autobatcher's AsyncOpenAI client routes the same requests through async inference for quicker turnaround than the BatchOpenAI batch client.
+
+The API will respond with an object with information about your batch.
+
+{
+  "id": "29cd13af-5ce9-487e-98ff-4eb6730c12b4",
+  "object": "batch",
+  "endpoint": "/v1/chat/completions",
+  "errors": null,
+  "input_file_id": "09efc84c-cd4f-4ae9-a2fd-5efbc4213225",
+  "completion_window": "24h",
+  "status": "validating",
+  "output_file_id": "b4213e44-3c85-4689-9cae-e6d986785143",
+  "error_file_id": "49fdc045-77a8-409b-bb3e-d661df05f9fb",
+  "created_at": 1714508499,
+  "in_progress_at": null,
+  "expires_at": 1714536634,
+  "completed_at": null,
+  "failed_at": null,
+  "expired_at": null,
+  "request_counts": {
+    "total": 0,
+    "completed": 0,
+    "failed": 0
+  },
+  "metadata": null
+}
+
+The output and error file ids are populated immediately, and allow you to retrieve individual results as they become available.
+
+Note
+We will use the id, error_file_id, and output_file_id fields later to track the progress of the batch, and download the results as they complete.
+
+Doubleword Console
+In the Console, uploading your file in the previous step already created and started the batch — there's no separate trigger step.
+
+4. Tracking your batches progress
+Tip
+Did you know you can download partial results as the batch is processing? To do this just download the output file that is created when the batch is submitted.
+
+Batch API
+
+Python
+from openai import OpenAI
+client = OpenAI(
+    api_key="{{apiKey}}",
+    base_url="https://api.doubleword.ai/v1/"
+)
+# Check batch status
+batch_status = client.batches.retrieve(result.id)
+print(f"Status: {batch_status.status}")
+
+Doubleword Console
+The Doubleword Console contains tools to track the completion of the requests in your batch in real time. Simply click on a batch to view each response as requests complete, see the price of your batch over time, and view the number of completed requests.
+
+5. Retrieving results
+When a batch is triggered, the Doubleword Batch engine will create two files, an Error file, and an Output file. The identifiers for these files can be found in the response to the batch creation request. The error file contains details on any request that failed, while the output file contains all the outputs from valid requests.
+
+These files are accessible as soon as the batch is triggered 4. To download all the completed responses for an in-progress batch, download the output or error file. If the batch is still in progress, the response headers will indicate how to resume the download from the last retrieved response.
+
+Note
+Make sure to replace the output file id with the one returned from the batch creation request!
+
+Batch API
+
+Python
+import requests
+
+#Get file output ID
+batch_output_file_id = result.output_file_id
+
+# Download file content
+url = f"https://api.doubleword.ai/v1/files/{batch_output_file_id}/content"
+headers = {
+    "Authorization": "Bearer {{apiKey}}"
+}
+
+response = requests.get(url, headers=headers)
+
+# Check if file is incomplete (batch still running)
+is_incomplete = response.headers.get("X-Incomplete") == "true"
+last_line = response.headers.get("X-Last-Line")
+
+# Save to file
+with open("batch-output.jsonl", "wb") as f:
+    f.write(response.content)
+
+if is_incomplete:
+    print(f"Partial file downloaded (up to line {last_line})")
+    print(f"To resume from this point: add ?offset={last_line} to the URL")
+else:
+    print("Complete file downloaded!")
+
+Doubleword Console
+The output file of the batches can be retrieved from the Batches Section by clicking the Document Icon under Results in the table and then clicking Download.
+
+6. Cancel a batch
+You can cancel a batch at any time. Any requests that haven't started processing will immediately move to the cancelled state5, and you won't be charged for successfully cancelled requests. If some requests have already been processed before cancellation, you can still download and view those results.
+
+Batch API
+
+Python
+from openai import OpenAI
+client = OpenAI(
+    api_key="{{apiKey}}",
+    base_url="https://api.doubleword.ai/v1"
+)
+
+client.batches.cancel("29cd13af-5ce9-487e-98ff-4eb6730c12b4")
+
+Doubleword Console
+In the Batches section, simply navigate to the row in the table you would like to cancel and select the X icon under Results to cancel the batch.
+
+7. Get a list of all batches
+Batch API
+You can see all of your batches by calling the list batches endpoint.
+
+
+Python
+from openai import OpenAI
+client = OpenAI(
+    api_key="{{apiKey}}",
+    base_url="https://api.doubleword.ai/v1"
+)
+
+client.batches.list(limit=10)
+
+Doubleword Console
+You can list all batches by navigating to the Batches section
+
+What next?
+After reading this guide, you should be able to submit batches to the Doubleword API, track their progress, and download their results.
+
+Note
+For any issues you encounter while using the API, please contact us.
